@@ -1,13 +1,18 @@
 import { useState, useEffect } from 'react';
 import Filters from './components/Filters';
 import ChartContainer from './components/ChartContainer';
+import SummaryChart from './components/SummaryChart';
+import QualityDistributionChart from './components/QualityDistributionChart';
 import TrendAnalysis from './components/TrendAnalysis';
 import QualityIndicator from './components/QualityIndicator';
+import Pagination from './components/Pagination';
+import { getLocations, getMetrics } from './api';
 
 function App() {
   const [locations, setLocations] = useState([]);
   const [metrics, setMetrics] = useState([]);
   const [climateData, setClimateData] = useState([]);
+  const [summaryData, setSummaryData] = useState({});
   const [trendData, setTrendData] = useState(null);
   const [filters, setFilters] = useState({
     locationId: '',
@@ -17,12 +22,38 @@ function App() {
     qualityThreshold: '',
     analysisType: 'raw'
   });
+  const [pagination, setPagination] = useState({
+    page: 1,
+    perPage: 20,
+    totalCount: 0
+  });
   const [loading, setLoading] = useState(false);
+  const [filtersLoading, setFiltersLoading] = useState(true);
 
-  // Existing useEffect for locations and metrics
+  // Load location and metric data
+  useEffect(() => {
+    const fetchFilterData = async () => {
+      setFiltersLoading(true);
+      try {
+        const [locationsResponse, metricsResponse] = await Promise.all([
+          getLocations(),
+          getMetrics()
+        ]);
+        
+        setLocations(locationsResponse.data || []);
+        setMetrics(metricsResponse.data || []);
+      } catch (error) {
+        console.error('Error fetching filter data:', error);
+      } finally {
+        setFiltersLoading(false);
+      }
+    };
 
-  // Updated fetch function to handle different analysis types
-  const fetchData = async () => {
+    fetchFilterData();
+  }, []);
+
+  // Updated fetch function to handle different analysis types and pagination
+  const fetchData = async (page = pagination.page, itemsPerPage = pagination.perPage) => {
     setLoading(true);
     try {
       const queryParams = new URLSearchParams({
@@ -30,8 +61,18 @@ function App() {
         ...(filters.startDate && { start_date: filters.startDate }),
         ...(filters.endDate && { end_date: filters.endDate }),
         ...(filters.metric && { metric: filters.metric }),
-        ...(filters.qualityThreshold && { quality_threshold: filters.qualityThreshold })
+        ...(filters.qualityThreshold && { quality_threshold: filters.qualityThreshold }),
+        page: page,
+        per_page: itemsPerPage
       });
+
+      // Convert Date objects to strings
+      if (filters.startDate instanceof Date) {
+        queryParams.set('start_date', filters.startDate.toISOString().split('T')[0]);
+      }
+      if (filters.endDate instanceof Date) {
+        queryParams.set('end_date', filters.endDate.toISOString().split('T')[0]);
+      }
 
       let endpoint = '/api/v1/climate';
       if (filters.analysisType === 'trends') {
@@ -45,14 +86,44 @@ function App() {
       
       if (filters.analysisType === 'trends') {
         setTrendData(data.data);
+      } else if (filters.analysisType === 'weighted') {
+        setSummaryData(data.data);
       } else {
         setClimateData(data.data);
+        // Update pagination metadata
+        if (data.meta) {
+          setPagination({
+            ...pagination,
+            page: data.meta.page,
+            perPage: itemsPerPage,
+            totalCount: data.meta.total_count
+          });
+        }
       }
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  // Page change handler
+  const handlePageChange = (newPage) => {
+    setPagination({
+      ...pagination,
+      page: newPage
+    });
+    fetchData(newPage);
+  };
+
+  // Items per page change handler
+  const handlePerPageChange = (newPerPage) => {
+    setPagination({
+      ...pagination,
+      page: 1, // Reset to first page when changing items per page
+      perPage: newPerPage
+    });
+    fetchData(1, newPerPage);
   };
 
   return (
@@ -71,7 +142,8 @@ function App() {
         metrics={metrics}
         filters={filters}
         onFilterChange={setFilters}
-        onApplyFilters={fetchData}
+        onApplyFilters={() => fetchData(1)} // Move to first page when applying filters
+        loading={filtersLoading}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
@@ -80,6 +152,20 @@ function App() {
             data={trendData}
             loading={loading}
           />
+        ) : filters.analysisType === 'weighted' ? (
+          <>
+            <SummaryChart 
+              title="Climate Summary Statistics"
+              loading={loading}
+              summaryData={summaryData}
+            />
+            <QualityDistributionChart 
+              title="Quality Distribution"
+              loading={loading}
+              summaryData={summaryData}
+              metric={filters.metric}
+            />
+          </>
         ) : (
           <>
             <ChartContainer 
@@ -100,10 +186,24 @@ function App() {
         )}
       </div>
 
-      <QualityIndicator 
-        data={climateData}
-        className="mt-6"
-      />
+      {filters.analysisType !== 'weighted' && (
+        <QualityIndicator 
+          data={climateData}
+          className="mt-6"
+        />
+      )}
+
+      {/* Pagination component - only show for raw climate data mode */}
+      {filters.analysisType === 'raw' && (
+        <Pagination 
+          page={pagination.page}
+          perPage={pagination.perPage}
+          totalCount={pagination.totalCount}
+          onPageChange={handlePageChange}
+          onPerPageChange={handlePerPageChange}
+          className="mt-6"
+        />
+      )}
     </div>
   );
 }

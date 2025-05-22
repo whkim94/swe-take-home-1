@@ -11,7 +11,15 @@ const API_BASE_URL = '/api/v1';
  */
 export const getClimateData = async (filters = {}) => {
   try {
-    // TODO: Implement API call with filters
+    const queryParams = new URLSearchParams(filters).toString();
+    const response = await fetch(`${API_BASE_URL}/climate?${queryParams}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    const data = await response.json();
+    return data;
   } catch (error) {
     console.error('API Error:', error);
     throw error;
@@ -24,7 +32,14 @@ export const getClimateData = async (filters = {}) => {
  */
 export const getLocations = async () => {
   try {
-    // TODO: Implement API call
+    const response = await fetch(`${API_BASE_URL}/locations`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    const data = await response.json();
+    return data;
   } catch (error) {
     console.error('API Error:', error);
     throw error;
@@ -37,7 +52,14 @@ export const getLocations = async () => {
  */
 export const getMetrics = async () => {
   try {
-    // TODO: Implement API call
+    const response = await fetch(`${API_BASE_URL}/metrics`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    const data = await response.json();
+    return data;
   } catch (error) {
     console.error('API Error:', error);
     throw error;
@@ -51,7 +73,15 @@ export const getMetrics = async () => {
  */
 export const getClimateSummary = async (filters = {}) => {
   try {
-    // TODO: Implement API call with filters
+    const queryParams = new URLSearchParams(filters).toString();
+    const response = await fetch(`${API_BASE_URL}/summary?${queryParams}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    const data = await response.json();
+    return data;
   } catch (error) {
     console.error('API Error:', error);
     throw error;
